@@ -33,7 +33,7 @@ export default function Home() {
       // Init auth token
       const userToken = await getLiveKitToken({
         room: roomName,
-        identity: "host",
+        identity: `host-${crypto.randomUUID()}`,
       });
 
       // Connect to the room with auth token

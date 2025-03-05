@@ -20,7 +20,7 @@ const ViewerPage = () => {
     try {
       const userToken = await getLiveKitToken({
         room: roomQuery!,
-        identity: "viewer",
+        identity: `viewer-${crypto.randomUUID()}`,
       });
       const newRoom = new Room();
 
