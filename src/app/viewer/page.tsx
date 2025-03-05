@@ -5,16 +5,16 @@ import { Room, Track } from "livekit-client";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const ViewerPage = () => {
-  const [room, setRoom] = useState<Room | null>(null);
-  const [roomQuery, setRoomQuery] = useState<string>(
-    useSearchParams().get("room") ?? ""
-  );
   const router = useRouter();
   const userWebcamRef = useRef<HTMLVideoElement>(null);
   const userScreenRef = useRef<HTMLVideoElement>(null);
   const microphoneAudioRef = useRef<HTMLAudioElement>(null);
   const screenAudioRef = useRef<HTMLAudioElement>(null);
   const divRef = useRef<HTMLDivElement>(null);
+  const [room, setRoom] = useState<Room | null>(null);
+  const [roomQuery, setRoomQuery] = useState<string>(
+    useSearchParams().get("room") ?? ""
+  );
 
   const connectToRoom = async () => {
     try {
@@ -64,7 +64,7 @@ const ViewerPage = () => {
   };
 
   const searchHandler = () => {
-    router.push(`http://localhost:3001/viewer?room=${roomQuery}`);
+    router.push(`http://localhost:3000/viewer?room=${roomQuery}`);
     connectToRoom();
   };
 

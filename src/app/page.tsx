@@ -13,11 +13,11 @@ import Webcam from "react-webcam";
 import { getLiveKitToken } from "../utils/livekit-token-generator";
 
 export default function Home() {
+  const webcamRef = useRef(null);
   const [roomName, setRoomName] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const webcamRef = useRef(null);
 
   const isButtonStartStreamDisabled = useMemo(() => {
     return roomName.trim() === "" || isStreaming;
