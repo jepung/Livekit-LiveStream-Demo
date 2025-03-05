@@ -1,7 +1,7 @@
 "use client";
 import React, { useEffect, useRef, useState } from "react";
-import { getLiveKitToken } from "../../utils/webrtc-adaptor";
-import { Room } from "livekit-client";
+import { getLiveKitToken } from "../../utils/livekit-token-generator";
+import { Room, Track } from "livekit-client";
 import { useRouter, useSearchParams } from "next/navigation";
 
 const ViewerPage = () => {
@@ -12,6 +12,9 @@ const ViewerPage = () => {
   const router = useRouter();
   const userWebcamRef = useRef<HTMLVideoElement>(null);
   const userScreenRef = useRef<HTMLVideoElement>(null);
+  const microphoneAudioRef = useRef<HTMLAudioElement>(null);
+  const screenAudioRef = useRef<HTMLAudioElement>(null);
+  const divRef = useRef<HTMLDivElement>(null);
 
   const connectToRoom = async () => {
     try {
@@ -23,14 +26,28 @@ const ViewerPage = () => {
 
       newRoom.on("trackSubscribed", (track) => {
         if (track.kind === "video") {
-          if (track.source === "camera") {
+          console.log(track.kind, track.source);
+          if (track.source === Track.Source.Camera) {
             userWebcamRef.current!.srcObject = new MediaStream([
               track.mediaStreamTrack,
             ]);
-          } else {
+          } else if (track.source === Track.Source.ScreenShare) {
             userScreenRef.current!.srcObject = new MediaStream([
               track.mediaStreamTrack,
             ]);
+          }
+        } else {
+          console.log(track.kind, track.source);
+          if (track.source === Track.Source.Microphone) {
+            microphoneAudioRef.current!.srcObject = new MediaStream([
+              track.mediaStreamTrack,
+            ]);
+            microphoneAudioRef.current!.volume = 1.0;
+          } else if (track.source === Track.Source.ScreenShareAudio) {
+            screenAudioRef.current!.srcObject = new MediaStream([
+              track.mediaStreamTrack,
+            ]);
+            screenAudioRef.current!.volume = 1.0;
           }
         }
       });
@@ -60,8 +77,19 @@ const ViewerPage = () => {
     };
   }, [userScreenRef, userWebcamRef]);
 
+  useEffect(() => {
+    if (divRef) {
+      divRef.current?.addEventListener("click", () => {
+        microphoneAudioRef.current!.play();
+        screenAudioRef.current!.play();
+        userScreenRef.current!.play();
+        userWebcamRef.current!.play();
+      });
+    }
+  }, [divRef]);
+
   return (
-    <div className="flex flex-col h-screen w-screen p-52">
+    <div ref={divRef} className="flex flex-col h-screen w-screen p-52">
       <div className="self-center flex items-center gap-2">
         <input
           placeholder="Input room name"
@@ -88,20 +116,29 @@ const ViewerPage = () => {
             autoPlay
             controls
             playsInline
-            muted
             className="w-full h-full"
+          />
+          <audio
+            ref={microphoneAudioRef}
+            controls
+            autoPlay
+            className="w-full h-10"
           />
         </div>
         <div className="flex-1 flex flex-col gap-2">
           <h2 className="text-3xl font-bold">Screen</h2>
-
           <video
             ref={userScreenRef}
             autoPlay
             controls
             playsInline
-            muted
             className="w-full h-full"
+          />
+          <audio
+            ref={screenAudioRef}
+            controls
+            autoPlay
+            className="w-full h-10"
           />
         </div>
       </div>

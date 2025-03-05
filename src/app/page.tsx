@@ -2,13 +2,15 @@
 
 import {
   createLocalAudioTrack,
-  createLocalScreenTracks,
   createLocalVideoTrack,
+  LocalAudioTrack,
+  LocalVideoTrack,
   Room,
+  Track,
 } from "livekit-client";
 import { useMemo, useRef, useState } from "react";
 import Webcam from "react-webcam";
-import { getLiveKitToken } from "../utils/webrtc-adaptor";
+import { getLiveKitToken } from "../utils/livekit-token-generator";
 
 export default function Home() {
   const [roomName, setRoomName] = useState<string>("");
@@ -39,23 +41,52 @@ export default function Home() {
       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, userToken);
       setRoom(newRoom);
 
-      // Init webcam and desktop screen
-      const videoTrack = await createLocalVideoTrack();
-      const audioTrack = await createLocalAudioTrack();
-      const screenTrack = await createLocalScreenTracks();
+      // Init + streaming webcam (using livekit function)
+      const webcamVideoTrack = await createLocalVideoTrack();
+      const webcamAudioTrack = await createLocalAudioTrack();
+      newRoom.localParticipant.publishTrack(webcamVideoTrack);
+      newRoom.localParticipant.publishTrack(webcamAudioTrack);
 
-      // Streaming the webcam and desktop screen to the room
-      newRoom.localParticipant.publishTrack(videoTrack);
-      newRoom.localParticipant.publishTrack(audioTrack);
-      screenTrack.forEach((track) =>
-        newRoom.localParticipant.publishTrack(track)
-      );
+      // Init + streaming share screen (manually config share screen to get audio track)
+      initStreamingShareScreen(newRoom);
 
       setIsStreaming(true);
     } catch (e) {
       console.log(e);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const initStreamingShareScreen = async (streamingRoom: Room) => {
+    const screen = await startShareScreen();
+    const screenVideoTrack = screen?.getVideoTracks()[0];
+    const screenAudioTrack = screen?.getAudioTracks()[0];
+    streamingRoom.localParticipant.publishTrack(
+      new LocalVideoTrack(screenVideoTrack!),
+      {
+        source: Track.Source.ScreenShare,
+      }
+    );
+    if (screenAudioTrack) {
+      streamingRoom.localParticipant.publishTrack(
+        new LocalAudioTrack(screenAudioTrack),
+        {
+          source: Track.Source.ScreenShareAudio,
+        }
+      );
+    }
+  };
+
+  const startShareScreen = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getDisplayMedia({
+        video: true,
+        audio: true,
+      });
+      return stream;
+    } catch (e) {
+      console.log(e, "startShareScreen");
     }
   };
 

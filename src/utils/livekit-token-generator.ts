@@ -5,7 +5,6 @@ export const getLiveKitToken = async ({
   room: string;
   identity: string;
 }) => {
-  console.log(room, identity);
   const res = await fetch("api/livekit-token", {
     method: "POST",
     body: JSON.stringify({ room, identity }),
