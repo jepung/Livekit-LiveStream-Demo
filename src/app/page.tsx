@@ -1,23 +1,21 @@
 "use client";
 
-import {
-  createLocalAudioTrack,
-  createLocalVideoTrack,
-  LocalAudioTrack,
-  LocalVideoTrack,
-  Room,
-  Track,
-} from "livekit-client";
+import { LocalAudioTrack, LocalVideoTrack, Room, Track } from "livekit-client";
 import { useMemo, useRef, useState } from "react";
-import Webcam from "react-webcam";
 import { getLiveKitToken } from "../utils/livekit-token-generator";
+import { usePathname } from "next/navigation";
+import Link from "next/link";
 
 export default function Home() {
-  const webcamRef = useRef(null);
+  const webcamRef = useRef<HTMLVideoElement>(null);
+
+  const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
+  const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
   const [roomName, setRoomName] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
+  const pathname = usePathname();
 
   const isButtonStartStreamDisabled = useMemo(() => {
     return roomName.trim() === "" || isStreaming;
@@ -41,16 +39,12 @@ export default function Home() {
       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, userToken);
       setRoom(newRoom);
 
-      // Init + streaming webcam (using livekit function)
-      const webcamVideoTrack = await createLocalVideoTrack();
-      const webcamAudioTrack = await createLocalAudioTrack();
-      newRoom.localParticipant.publishTrack(webcamVideoTrack);
-      newRoom.localParticipant.publishTrack(webcamAudioTrack);
-
-      // Init + streaming share screen (manually config share screen to get audio track)
-      initStreamingShareScreen(newRoom);
+      // Stream the media to the streaming room
+      streamMedia("WEBCAM", newRoom);
+      streamMedia("SCREEN", newRoom);
 
       setIsStreaming(true);
+      alert("Streming ON");
     } catch (e) {
       console.log(e);
     } finally {
@@ -58,21 +52,32 @@ export default function Home() {
     }
   };
 
-  const initStreamingShareScreen = async (streamingRoom: Room) => {
-    const screen = await startShareScreen();
-    const screenVideoTrack = screen?.getVideoTracks()[0];
-    const screenAudioTrack = screen?.getAudioTracks()[0];
-    streamingRoom.localParticipant.publishTrack(
-      new LocalVideoTrack(screenVideoTrack!),
-      {
-        source: Track.Source.ScreenShare,
-      }
-    );
-    if (screenAudioTrack) {
+  const streamMedia = async (
+    type: "SCREEN" | "WEBCAM",
+    streamingRoom: Room
+  ) => {
+    const media = type === "SCREEN" ? screenStream : webcamStream;
+
+    const mediaVideoTrack = media?.getVideoTracks()[0];
+    const mediaAudioTrack = media?.getAudioTracks()[0];
+
+    if (mediaVideoTrack) {
       streamingRoom.localParticipant.publishTrack(
-        new LocalAudioTrack(screenAudioTrack),
+        new LocalVideoTrack(mediaVideoTrack),
         {
-          source: Track.Source.ScreenShareAudio,
+          source:
+            type === "SCREEN" ? Track.Source.ScreenShare : Track.Source.Camera,
+        }
+      );
+    }
+    if (mediaAudioTrack) {
+      streamingRoom.localParticipant.publishTrack(
+        new LocalAudioTrack(mediaAudioTrack),
+        {
+          source:
+            type === "SCREEN"
+              ? Track.Source.ScreenShareAudio
+              : Track.Source.Microphone,
         }
       );
     }
@@ -80,19 +85,54 @@ export default function Home() {
 
   const startShareScreen = async () => {
     try {
-      const stream = await navigator.mediaDevices.getDisplayMedia({
+      const screen = await navigator.mediaDevices.getDisplayMedia({
         video: true,
         audio: true,
       });
-      return stream;
+
+      setScreenStream(screen);
     } catch (e) {
       console.log(e, "startShareScreen");
     }
   };
 
+  const startWebcam = async () => {
+    try {
+      const webcam = await navigator.mediaDevices.getUserMedia({
+        video: true,
+        audio: true,
+      });
+
+      if (webcamRef.current) {
+        webcamRef.current!.srcObject = webcam;
+      }
+
+      setWebcamStream(webcam);
+    } catch (e) {
+      console.log(e, "startWebcam");
+    }
+  };
+
+  const stopWebcam = () => {
+    webcamStream?.getVideoTracks()[0].stop();
+    webcamStream?.getAudioTracks()[0].stop();
+    setWebcamStream(null);
+  };
+
   const stopStreaming = async () => {
     await room?.disconnect();
     setIsStreaming(false);
+    setWebcamStream(null);
+    setScreenStream(null);
+    alert("Streming OFF");
+  };
+
+  const stopShareScreen = () => {
+    screenStream?.getVideoTracks()[0].stop();
+    if (screenStream?.getAudioTracks()[0]) {
+      screenStream?.getAudioTracks()[0].stop();
+    }
+    setScreenStream(null);
   };
 
   return (
@@ -105,6 +145,18 @@ export default function Home() {
         />
       </div>
       <div className="flex gap-5 mt-5">
+        <button
+          onClick={webcamStream ? stopWebcam : startWebcam}
+          className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
+        >
+          {webcamStream ? "Stop Webcam" : "Start Webcam"}
+        </button>
+        <button
+          onClick={screenStream ? stopShareScreen : startShareScreen}
+          className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
+        >
+          {screenStream ? "Stop ShareScreen" : "Start ShareScreen"}
+        </button>
         <button
           disabled={isButtonStartStreamDisabled}
           onClick={startStreaming}
@@ -127,15 +179,29 @@ export default function Home() {
         </button>
       </div>
       <div className="mt-5">
-        <p>Status: {isStreaming ? "Live on" : "Live off"}</p>
+        <p className="text-center">
+          Status: {isStreaming ? "Live on" : "Live off"}
+        </p>
+        {isStreaming && (
+          <Link
+            href={pathname + `viewer?room=${roomName}`}
+            target="_blank"
+            className="text-center underline text-blue-500 cursor-pointer"
+          >
+            Go to viewer screen
+          </Link>
+        )}
       </div>
-      <Webcam
-        className="mt-20"
-        ref={webcamRef}
-        height={600}
-        width={500}
-        videoConstraints={{ width: 600, height: 500, facingMode: "user" }}
-      />
+      <div className="mt-10">
+        <video
+          ref={webcamRef}
+          height={600}
+          width={500}
+          autoPlay
+          controls
+          playsInline
+        />
+      </div>
     </div>
   );
 }
