@@ -138,6 +138,9 @@ export default function Home() {
   return (
     <div className="flex flex-col justify-center items-center p-20">
       <div>
+        <h1 className="text-3xl font-bold">LiveKit</h1>
+      </div>
+      <div className="mt-10">
         <input
           onChange={(e) => setRoomName(e.target.value)}
           className="border px-5 py-3 rounded-md"
