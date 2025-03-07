@@ -40,8 +40,12 @@ export default function Home() {
       setRoom(newRoom);
 
       // Stream the media to the streaming room
-      streamMedia("WEBCAM", newRoom);
-      streamMedia("SCREEN", newRoom);
+      if (webcamStream) {
+        streamMedia("WEBCAM", webcamStream, newRoom);
+      }
+      if (screenStream) {
+        streamMedia("SCREEN", screenStream, newRoom);
+      }
 
       setIsStreaming(true);
       alert("Streming ON");
@@ -54,12 +58,11 @@ export default function Home() {
 
   const streamMedia = async (
     type: "SCREEN" | "WEBCAM",
+    media: MediaStream,
     streamingRoom: Room
   ) => {
-    const media = type === "SCREEN" ? screenStream : webcamStream;
-
-    const mediaVideoTrack = media?.getVideoTracks()[0];
-    const mediaAudioTrack = media?.getAudioTracks()[0];
+    const mediaVideoTrack = media.getVideoTracks()[0];
+    const mediaAudioTrack = media.getAudioTracks()[0];
 
     if (mediaVideoTrack) {
       streamingRoom.localParticipant.publishTrack(
@@ -91,6 +94,11 @@ export default function Home() {
       });
 
       setScreenStream(screen);
+
+      // For restreaming webcam stream if webcam off and then on when in live streaming on
+      if (isStreaming && room) {
+        streamMedia("SCREEN", screen, room);
+      }
     } catch (e) {
       console.log(e, "startShareScreen");
     }
@@ -103,11 +111,17 @@ export default function Home() {
         audio: true,
       });
 
+      setWebcamStream(webcam);
+
+      // Showing webcam video in main page
       if (webcamRef.current) {
         webcamRef.current!.srcObject = webcam;
       }
 
-      setWebcamStream(webcam);
+      // For restreaming webcam stream if webcam off and then on when in live streaming on
+      if (isStreaming && room) {
+        streamMedia("WEBCAM", webcam, room);
+      }
     } catch (e) {
       console.log(e, "startWebcam");
     }
@@ -149,13 +163,15 @@ export default function Home() {
       </div>
       <div className="flex gap-5 mt-5">
         <button
-          onClick={webcamStream ? stopWebcam : startWebcam}
+          onClick={() => (webcamStream ? stopWebcam() : startWebcam())}
           className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
         >
           {webcamStream ? "Stop Webcam" : "Start Webcam"}
         </button>
         <button
-          onClick={screenStream ? stopShareScreen : startShareScreen}
+          onClick={() =>
+            screenStream ? stopShareScreen() : startShareScreen()
+          }
           className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
         >
           {screenStream ? "Stop ShareScreen" : "Start ShareScreen"}
