@@ -89,7 +89,7 @@ const ViewerPage = () => {
   }, [divRef]);
 
   return (
-    <div ref={divRef} className="flex flex-col h-screen w-screen p-52">
+    <div ref={divRef} className="flex flex-col h-screen w-screen px-52 pt-20">
       <div className="self-center flex items-center gap-2">
         <input
           placeholder="Input room name"
