@@ -16,11 +16,11 @@ export default function Home() {
     null
   );
   const [roomName, setRoomName] = useState<string>("");
-  const [room, setRoom] = useState<Room | null>(null);
+  const [streamingRoom, setStreamingRoom] = useState<Room | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const initRoom = async () => {
+  const initStreamingRoom = async () => {
     try {
       setIsLoading(true);
       const userToken = await getLiveKitToken({
@@ -31,7 +31,7 @@ export default function Home() {
       const newRoom = new Room();
       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, userToken);
 
-      setRoom(newRoom);
+      setStreamingRoom(newRoom);
       setIsStreaming(true);
       alert("Room initialized");
     } catch (e) {
@@ -52,17 +52,22 @@ export default function Home() {
     if (type === "START") {
       switch (device) {
         case "WEBCAM": {
-          media = await room?.localParticipant.setCameraEnabled(true);
+          media = await streamingRoom?.localParticipant.setCameraEnabled(true);
           break;
         }
         case "MICROPHONE": {
-          media = await room?.localParticipant.setMicrophoneEnabled(true);
+          media = await streamingRoom?.localParticipant.setMicrophoneEnabled(
+            true
+          );
           break;
         }
         case "SCREEN": {
-          media = await room?.localParticipant.setScreenShareEnabled(true, {
-            audio: true,
-          });
+          media = await streamingRoom?.localParticipant.setScreenShareEnabled(
+            true,
+            {
+              audio: true,
+            }
+          );
           break;
         }
       }
@@ -87,17 +92,17 @@ export default function Home() {
     } else {
       switch (device) {
         case "WEBCAM": {
-          room?.localParticipant.setCameraEnabled(false);
+          streamingRoom?.localParticipant.setCameraEnabled(false);
           setWebcamStream(null);
           break;
         }
         case "MICROPHONE": {
-          room?.localParticipant.setMicrophoneEnabled(false);
+          streamingRoom?.localParticipant.setMicrophoneEnabled(false);
           setMicrophoneStream(null);
           break;
         }
         case "SCREEN": {
-          room?.localParticipant.setScreenShareEnabled(false);
+          streamingRoom?.localParticipant.setScreenShareEnabled(false);
           setScreenStream(null);
           break;
         }
@@ -106,7 +111,7 @@ export default function Home() {
   };
 
   const stopStreaming = async () => {
-    await room?.disconnect();
+    await streamingRoom?.disconnect();
     setIsStreaming(false);
     configDevice("WEBCAM", "STOP");
     configDevice("MICROPHONE", "STOP");
@@ -127,7 +132,7 @@ export default function Home() {
         />
         <button
           disabled={isLoading}
-          onClick={initRoom}
+          onClick={initStreamingRoom}
           className="px-5 py-3 border border-slate-500 rounded cursor-pointer"
         >
           {isLoading ? "Loading..." : "Create"}
