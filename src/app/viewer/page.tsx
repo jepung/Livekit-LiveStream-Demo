@@ -26,7 +26,6 @@ const ViewerPage = () => {
 
       newRoom.on("trackSubscribed", (track) => {
         if (track.kind === "video") {
-          console.log(track.kind, track.source);
           if (track.source === Track.Source.Camera) {
             userWebcamRef.current!.srcObject = new MediaStream([
               track.mediaStreamTrack,
@@ -37,7 +36,6 @@ const ViewerPage = () => {
             ]);
           }
         } else {
-          console.log(track.kind, track.source);
           if (track.source === Track.Source.Microphone) {
             microphoneAudioRef.current!.srcObject = new MediaStream([
               track.mediaStreamTrack,
@@ -52,14 +50,12 @@ const ViewerPage = () => {
         }
       });
 
-      newRoom.on("trackUnsubscribed", () => {
-        console.log("unsubscribed");
-      });
-
       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, userToken);
       setRoom(room);
     } catch (e) {
-      console.log(e);
+      if (e instanceof Error) {
+        alert(e.message);
+      }
     }
   };
 

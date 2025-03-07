@@ -1,152 +1,117 @@
 "use client";
 
-import { LocalAudioTrack, LocalVideoTrack, Room, Track } from "livekit-client";
-import { useMemo, useRef, useState } from "react";
-import { getLiveKitToken } from "../utils/livekit-token-generator";
-import { usePathname } from "next/navigation";
+import { LocalTrackPublication, Room } from "livekit-client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
+import { useRef, useState } from "react";
+import { getLiveKitToken } from "../utils/livekit-token-generator";
 
 export default function Home() {
   const webcamRef = useRef<HTMLVideoElement>(null);
+  const pathname = usePathname();
 
   const [webcamStream, setWebcamStream] = useState<MediaStream | null>(null);
   const [screenStream, setScreenStream] = useState<MediaStream | null>(null);
+  const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(
+    null
+  );
   const [roomName, setRoomName] = useState<string>("");
   const [room, setRoom] = useState<Room | null>(null);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const pathname = usePathname();
 
-  const isButtonStartStreamDisabled = useMemo(() => {
-    return roomName.trim() === "" || isStreaming;
-  }, [roomName, isStreaming]);
-
-  const isButtonStopStreamDisabled = useMemo(() => {
-    return roomName.trim() === "" || !isStreaming;
-  }, [roomName, isStreaming]);
-
-  const startStreaming = async () => {
-    setIsLoading(true);
+  const initRoom = async () => {
     try {
-      // Init auth token
+      setIsLoading(true);
       const userToken = await getLiveKitToken({
         room: roomName,
         identity: `host-${crypto.randomUUID()}`,
       });
 
-      // Connect to the room with auth token
       const newRoom = new Room();
       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, userToken);
+
       setRoom(newRoom);
-
-      // Stream the media to the streaming room
-      if (webcamStream) {
-        streamMedia("WEBCAM", webcamStream, newRoom);
-      }
-      if (screenStream) {
-        streamMedia("SCREEN", screenStream, newRoom);
-      }
-
       setIsStreaming(true);
-      alert("Streming ON");
+      alert("Room initialized");
     } catch (e) {
-      console.log(e);
+      if (e instanceof Error) {
+        alert(e.message);
+      }
     } finally {
       setIsLoading(false);
     }
   };
 
-  const streamMedia = async (
-    type: "SCREEN" | "WEBCAM",
-    media: MediaStream,
-    streamingRoom: Room
+  const configDevice = async (
+    device: "WEBCAM" | "MICROPHONE" | "SCREEN",
+    type: "START" | "STOP"
   ) => {
-    const mediaVideoTrack = media.getVideoTracks()[0];
-    const mediaAudioTrack = media.getAudioTracks()[0];
+    let media: LocalTrackPublication | undefined;
 
-    if (mediaVideoTrack) {
-      streamingRoom.localParticipant.publishTrack(
-        new LocalVideoTrack(mediaVideoTrack),
-        {
-          source:
-            type === "SCREEN" ? Track.Source.ScreenShare : Track.Source.Camera,
+    if (type === "START") {
+      switch (device) {
+        case "WEBCAM": {
+          media = await room?.localParticipant.setCameraEnabled(true);
+          break;
         }
-      );
-    }
-    if (mediaAudioTrack) {
-      streamingRoom.localParticipant.publishTrack(
-        new LocalAudioTrack(mediaAudioTrack),
-        {
-          source:
-            type === "SCREEN"
-              ? Track.Source.ScreenShareAudio
-              : Track.Source.Microphone,
+        case "MICROPHONE": {
+          media = await room?.localParticipant.setMicrophoneEnabled(true);
+          break;
         }
-      );
-    }
-  };
-
-  const startShareScreen = async () => {
-    try {
-      const screen = await navigator.mediaDevices.getDisplayMedia({
-        video: true,
-        audio: true,
-      });
-
-      setScreenStream(screen);
-
-      // For restreaming webcam stream if webcam off and then on when in live streaming on
-      if (isStreaming && room) {
-        streamMedia("SCREEN", screen, room);
+        case "SCREEN": {
+          media = await room?.localParticipant.setScreenShareEnabled(true, {
+            audio: true,
+          });
+          break;
+        }
       }
-    } catch (e) {
-      console.log(e, "startShareScreen");
-    }
-  };
-
-  const startWebcam = async () => {
-    try {
-      const webcam = await navigator.mediaDevices.getUserMedia({
-        video: true,
-        audio: true,
-      });
-
-      setWebcamStream(webcam);
-
-      // Showing webcam video in main page
-      if (webcamRef.current) {
-        webcamRef.current!.srcObject = webcam;
+      const mediaStream = media?.track?.mediaStream;
+      if (mediaStream) {
+        switch (device) {
+          case "WEBCAM": {
+            webcamRef.current!.srcObject = mediaStream;
+            setWebcamStream(mediaStream);
+            break;
+          }
+          case "MICROPHONE": {
+            setMicrophoneStream(mediaStream);
+            break;
+          }
+          case "SCREEN": {
+            setScreenStream(mediaStream);
+            break;
+          }
+        }
       }
-
-      // For restreaming webcam stream if webcam off and then on when in live streaming on
-      if (isStreaming && room) {
-        streamMedia("WEBCAM", webcam, room);
+    } else {
+      switch (device) {
+        case "WEBCAM": {
+          room?.localParticipant.setCameraEnabled(false);
+          setWebcamStream(null);
+          break;
+        }
+        case "MICROPHONE": {
+          room?.localParticipant.setMicrophoneEnabled(false);
+          setMicrophoneStream(null);
+          break;
+        }
+        case "SCREEN": {
+          room?.localParticipant.setScreenShareEnabled(false);
+          setScreenStream(null);
+          break;
+        }
       }
-    } catch (e) {
-      console.log(e, "startWebcam");
     }
-  };
-
-  const stopWebcam = () => {
-    webcamStream?.getVideoTracks()[0].stop();
-    webcamStream?.getAudioTracks()[0].stop();
-    setWebcamStream(null);
   };
 
   const stopStreaming = async () => {
     await room?.disconnect();
     setIsStreaming(false);
-    setWebcamStream(null);
-    setScreenStream(null);
-    alert("Streming OFF");
-  };
-
-  const stopShareScreen = () => {
-    screenStream?.getVideoTracks()[0].stop();
-    if (screenStream?.getAudioTracks()[0]) {
-      screenStream?.getAudioTracks()[0].stop();
-    }
-    setScreenStream(null);
+    configDevice("WEBCAM", "STOP");
+    configDevice("MICROPHONE", "STOP");
+    configDevice("SCREEN", "STOP");
+    alert("Streaming OFF");
   };
 
   return (
@@ -154,49 +119,62 @@ export default function Home() {
       <div>
         <h1 className="text-3xl font-bold">LiveKit</h1>
       </div>
-      <div className="mt-10">
+      <div className="mt-10 flex gap-5">
         <input
           onChange={(e) => setRoomName(e.target.value)}
           className="border px-5 py-3 rounded-md"
           placeholder="Input room name"
         />
-      </div>
-      <div className="flex gap-5 mt-5">
         <button
-          onClick={() => (webcamStream ? stopWebcam() : startWebcam())}
-          className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
+          disabled={isLoading}
+          onClick={initRoom}
+          className="px-5 py-3 border border-slate-500 rounded cursor-pointer"
         >
-          {webcamStream ? "Stop Webcam" : "Start Webcam"}
-        </button>
-        <button
-          onClick={() =>
-            screenStream ? stopShareScreen() : startShareScreen()
-          }
-          className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
-        >
-          {screenStream ? "Stop ShareScreen" : "Start ShareScreen"}
-        </button>
-        <button
-          disabled={isButtonStartStreamDisabled}
-          onClick={startStreaming}
-          className={`bg-slate-800 py-2 px-5 rounded-md ${
-            isButtonStartStreamDisabled
-              ? "cursor-not-allowed"
-              : "cursor-pointer"
-          }`}
-        >
-          {isLoading ? "Loading..." : "Start Streaming"}
-        </button>
-        <button
-          disabled={isButtonStopStreamDisabled}
-          onClick={stopStreaming}
-          className={`bg-red-800 py-2 px-5 rounded-md ${
-            isButtonStopStreamDisabled ? "cursor-not-allowed" : "cursor-pointer"
-          }`}
-        >
-          Stop Streaming
+          {isLoading ? "Loading..." : "Create"}
         </button>
       </div>
+      {isStreaming && (
+        <div className="flex gap-5 mt-5">
+          <button
+            onClick={() =>
+              webcamStream
+                ? configDevice("WEBCAM", "STOP")
+                : configDevice("WEBCAM", "START")
+            }
+            className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
+          >
+            {webcamStream ? "Stop Webcam" : "Start Webcam"}
+          </button>
+          <button
+            onClick={() =>
+              microphoneStream
+                ? configDevice("MICROPHONE", "STOP")
+                : configDevice("MICROPHONE", "START")
+            }
+            className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
+          >
+            {microphoneStream ? "Stop Microphone" : "Start Microphone"}
+          </button>
+          <button
+            onClick={() =>
+              screenStream
+                ? configDevice("SCREEN", "STOP")
+                : configDevice("SCREEN", "START")
+            }
+            className={`bg-slate-800 py-2 px-5 rounded-md cursor-pointer`}
+          >
+            {screenStream ? "Stop ShareScreen" : "Start ShareScreen"}
+          </button>
+          {isStreaming && (
+            <button
+              onClick={stopStreaming}
+              className={`bg-red-800 py-2 px-5 rounded-md cursor-pointer`}
+            >
+              Stop Streaming
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-5">
         <p className="text-center">
           Status: {isStreaming ? "Live on" : "Live off"}
@@ -211,15 +189,8 @@ export default function Home() {
           </Link>
         )}
       </div>
-      <div className="mt-10">
-        <video
-          ref={webcamRef}
-          height={600}
-          width={500}
-          autoPlay
-          controls
-          playsInline
-        />
+      <div className="mt-10 border border-slate-500">
+        <video ref={webcamRef} height={600} width={500} autoPlay playsInline />
       </div>
     </div>
   );
