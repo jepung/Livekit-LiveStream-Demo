@@ -1,16 +1,18 @@
 "use client";
-import React, { ReactNode, useEffect, useState } from "react";
-import { LiveKitRoom } from "@livekit/components-react";
 import { getLiveKitToken } from "@/utils/livekit-token-generator";
+import { LiveKitRoom } from "@livekit/components-react";
+import { useSearchParams } from "next/navigation";
+import { ReactNode, useEffect, useState } from "react";
 
 const ViewerLayout = ({ children }: { children: ReactNode }) => {
+  const room = useSearchParams().get("room");
   const [token, setToken] = useState<string>("");
 
   const init = async () => {
     try {
-      console.log("Start initializing");
+      alert("Intializing streaming room");
       const userToken = await getLiveKitToken({
-        room: "test",
+        room: room!,
         identity: `viewer-${crypto.randomUUID()}`,
       });
       setToken(userToken);
@@ -23,17 +25,16 @@ const ViewerLayout = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
-    init();
-  }, []);
+    if (room) {
+      init();
+    }
+  }, [room]);
 
   return (
     <LiveKitRoom
       serverUrl={"wss://demointerviewai-j84novad.livekit.cloud"}
       token={token}
       connect
-      onError={(e) => {
-        console.log(e, 123);
-      }}
     >
       {children}
     </LiveKitRoom>
