@@ -1,8 +1,19 @@
 "use client";
-import { AudioTrack, useTracks, VideoTrack } from "@livekit/components-react";
+
+import {
+  AudioTrack,
+  useRoomContext,
+  useTracks,
+  VideoTrack,
+} from "@livekit/components-react";
 import { Track } from "livekit-client";
+import { EgressInfo } from "livekit-server-sdk";
+import { useEffect, useState } from "react";
 
 const ViewerPage = () => {
+  const room = useRoomContext();
+  const [eggressInfo, setEggressInfo] = useState<EgressInfo | null>();
+
   const cameraTracks = useTracks([Track.Source.Camera], {
     onlySubscribed: true,
   });
@@ -16,13 +27,72 @@ const ViewerPage = () => {
     onlySubscribed: true,
   });
 
+  const startRecording = async () => {
+    try {
+      const res = await fetch("/api/start-egress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomName: room.name,
+        }),
+      });
+
+      const data = (await res.json()) as EgressInfo;
+
+      console.log("Recording started:", data);
+      setEggressInfo(data);
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log(e);
+      }
+    }
+  };
+
+  const stopRecording = async (egressId: string) => {
+    try {
+      const res = await fetch("/api/stop-egress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          egressId: egressId,
+        }),
+      });
+
+      const data = await res.json();
+      console.log("Recording stopped:", data);
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log(e);
+      }
+    }
+  };
+
+  useEffect(() => {
+    if (room.name) {
+      startRecording();
+    }
+  }, [room.name]);
+
   return (
-    <div className="flex flex-col h-screen w-screen px-52 pt-20">
+    <div className="flex flex-col h-screen w-screen px-52 py-20">
       <div>
         <h1 className="text-3xl font-bold text-center">LiveKit Viewer</h1>
       </div>
-
-      <div className="flex gap-52 items-center mt-10">
+      {eggressInfo && (
+        <div className="mt-5 mx-auto">
+          <button
+            onClick={() => stopRecording(eggressInfo.egressId)}
+            className="px-5 py-3 bg-slate-800 rounded-md cursor-pointer"
+          >
+            Stop Record
+          </button>
+        </div>
+      )}
+      <div className="flex gap-52 items-center mt-10 h-full">
         <div className="flex-1">
           <h2 className="text-2xl font-bold">Webcam</h2>
           <div className="mt-5 flex flex-col gap-5 ">
