@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useRef, useState } from "react";
 import { getLiveKitToken } from "../utils/livekit-token-generator";
+import { EgressInfo } from "livekit-server-sdk";
 
 export default function Home() {
   const webcamRef = useRef<HTMLVideoElement>(null);
@@ -20,6 +21,8 @@ export default function Home() {
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  const [eggressInfo, setEggressInfo] = useState<EgressInfo | null>();
+
   const initStreamingRoom = async () => {
     try {
       setIsLoading(true);
@@ -34,6 +37,8 @@ export default function Home() {
       setStreamingRoom(newRoom);
       setIsStreaming(true);
       alert("Room initialized");
+
+      await startRecording();
     } catch (e) {
       if (e instanceof Error) {
         alert(e.message);
@@ -111,12 +116,59 @@ export default function Home() {
   };
 
   const stopStreaming = async () => {
+    await stopRecording(eggressInfo!.egressId);
     await streamingRoom?.disconnect();
     setIsStreaming(false);
     configDevice("WEBCAM", "STOP");
     configDevice("MICROPHONE", "STOP");
     configDevice("SCREEN", "STOP");
     alert("Streaming OFF");
+  };
+
+  const startRecording = async () => {
+    try {
+      const res = await fetch("/api/start-egress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          roomName: roomName,
+        }),
+      });
+
+      const data = (await res.json()) as EgressInfo;
+
+      console.log("Recording started:", data);
+      setEggressInfo(data);
+      alert("Recording started");
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log(e);
+      }
+    }
+  };
+
+  const stopRecording = async (egressId: string) => {
+    try {
+      const res = await fetch("/api/stop-egress", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          egressId: egressId,
+        }),
+      });
+
+      const data = await res.json();
+      console.log("Recording stopped:", data);
+      alert("Recording stopped");
+    } catch (e) {
+      if (e instanceof Error) {
+        console.log(e);
+      }
+    }
   };
 
   return (
