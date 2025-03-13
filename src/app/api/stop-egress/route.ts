@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
     const { egressId } = await req.json();
 
     const egressClient = new EgressClient(
-      "https://demointerviewai-j84novad.livekit.cloud",
+      process.env.NEXT_PUBLIC_LIVEKIT_URL!,
       process.env.NEXT_PUBLIC_API_KEY,
       process.env.NEXT_PUBLIC_SECRET_KEY
     );

@@ -1,11 +1,11 @@
 "use client";
 
 import { LocalTrackPublication, Room } from "livekit-client";
+import { EgressInfo } from "livekit-server-sdk";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getLiveKitToken } from "../utils/livekit-token-generator";
-import { EgressInfo } from "livekit-server-sdk";
 
 export default function Home() {
   const webcamRef = useRef<HTMLVideoElement>(null);
@@ -16,29 +16,67 @@ export default function Home() {
   const [microphoneStream, setMicrophoneStream] = useState<MediaStream | null>(
     null
   );
-  const [roomName, setRoomName] = useState<string>("");
   const [streamingRoom, setStreamingRoom] = useState<Room | null>(null);
-  const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  const [eggressInfo, setEggressInfo] = useState<EgressInfo | null>();
+  const [egressId, setEgressId] = useState<string>("");
 
-  const initStreamingRoom = async () => {
+  const [roomName, setRoomName] = useState<string>("");
+  const [isStreaming, setIsStreaming] = useState<boolean>(false);
+
+  useEffect(() => {
+    let streamingRoomName = localStorage.getItem("streamingRoomName");
+    let isStreaming = localStorage.getItem("isStreaming");
+    let egressId = localStorage.getItem("egressId");
+
+    if (streamingRoomName) {
+      streamingRoomName = JSON.parse(streamingRoomName);
+    }
+
+    if (isStreaming) {
+      isStreaming = JSON.parse(isStreaming);
+    }
+
+    if (egressId) {
+      egressId = JSON.parse(egressId);
+    }
+
+    if (streamingRoomName && isStreaming && egressId) {
+      alert("reconnecting");
+      initStreamingRoom(streamingRoomName as string, true);
+      setIsStreaming(Boolean(isStreaming));
+      setRoomName(streamingRoomName);
+      setEgressId(egressId);
+      alert("reconnected");
+    }
+
+    window.onbeforeunload = () => {
+      streamingRoom?.disconnect();
+    };
+  }, []);
+
+  const initStreamingRoom = async (room: string, isPageReload?: boolean) => {
     try {
       setIsLoading(true);
       const userToken = await getLiveKitToken({
-        room: roomName,
+        room: room,
         identity: `host-${crypto.randomUUID()}`,
       });
 
       const newRoom = new Room();
       await newRoom.connect(process.env.NEXT_PUBLIC_LIVEKIT_URL!, userToken);
 
-      setStreamingRoom(newRoom);
+      setRoomName(room);
       setIsStreaming(true);
+      setStreamingRoom(newRoom);
+
+      localStorage.setItem("isStreaming", JSON.stringify(true));
+      localStorage.setItem("streamingRoomName", JSON.stringify(room));
       alert("Room initialized");
 
-      await startRecording();
+      if (!isPageReload) {
+        await startRecording(room);
+      }
     } catch (e) {
       if (e instanceof Error) {
         alert(e.message);
@@ -116,16 +154,24 @@ export default function Home() {
   };
 
   const stopStreaming = async () => {
-    await stopRecording(eggressInfo!.egressId);
+    await stopRecording(egressId);
     await streamingRoom?.disconnect();
+
     setIsStreaming(false);
+    setRoomName("");
+
     configDevice("WEBCAM", "STOP");
     configDevice("MICROPHONE", "STOP");
     configDevice("SCREEN", "STOP");
+
+    localStorage.setItem("egressId", JSON.stringify(""));
+    localStorage.setItem("isStreaming", JSON.stringify(false));
+    localStorage.setItem("streamingRoomName", JSON.stringify(""));
+
     alert("Streaming OFF");
   };
 
-  const startRecording = async () => {
+  const startRecording = async (room: string) => {
     try {
       const res = await fetch("/api/start-egress", {
         method: "POST",
@@ -133,18 +179,20 @@ export default function Home() {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
-          roomName: roomName,
+          roomName: room,
         }),
       });
 
       const data = (await res.json()) as EgressInfo;
 
       console.log("Recording started:", data);
-      setEggressInfo(data);
+      setEgressId(data.egressId);
+      localStorage.setItem("egressId", JSON.stringify(data.egressId));
       alert("Recording started");
     } catch (e) {
       if (e instanceof Error) {
         console.log(e);
+        alert("Start recording error");
       }
     }
   };
@@ -167,6 +215,7 @@ export default function Home() {
     } catch (e) {
       if (e instanceof Error) {
         console.log(e);
+        alert("Stop recording error");
       }
     }
   };
@@ -176,20 +225,29 @@ export default function Home() {
       <div>
         <h1 className="text-3xl font-bold">LiveKit</h1>
       </div>
-      <div className="mt-10 flex gap-5">
+      <form
+        action={(form) => {
+          const inputRoomName = form.get("input-roomname");
+          if (inputRoomName) {
+            setRoomName(inputRoomName as string);
+          }
+          initStreamingRoom(inputRoomName as string);
+        }}
+        className="mt-10 flex gap-5"
+      >
         <input
-          onChange={(e) => setRoomName(e.target.value)}
           className="border px-5 py-3 rounded-md"
           placeholder="Input room name"
+          name="input-roomname"
         />
         <button
           disabled={isLoading}
-          onClick={initStreamingRoom}
+          type="submit"
           className="px-5 py-3 border border-slate-500 rounded cursor-pointer"
         >
           {isLoading ? "Loading..." : "Create"}
         </button>
-      </div>
+      </form>
       {isStreaming && (
         <div className="flex gap-5 mt-5">
           <button

@@ -32,7 +32,7 @@ const ViewerLayout = ({ children }: { children: ReactNode }) => {
 
   return (
     <LiveKitRoom
-      serverUrl={"wss://demointerviewai-j84novad.livekit.cloud"}
+      serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL!}
       token={token}
       connect
     >
