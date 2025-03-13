@@ -22,8 +22,8 @@ export async function POST(req: NextRequest) {
         output: {
           case: "s3",
           value: {
-            accessKey: "AKIA3KIFA3JSFOVMBZ7H",
-            secret: "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",
+            accessKey: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY,
+            secret: process.env.NEXT_PUBLIC_AWS_SECRET_KEY,
             bucket: "streaming-recording-demo",
             region: "ap-southeast-1",
           },
