@@ -9,6 +9,8 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.758.0",
+    "@aws-sdk/s3-request-presigner": "^3.758.0",
     "@livekit/components-react": "^2.8.1",
     "@livekit/components-styles": "^1.1.4",
     "jotai": "^2.12.2",
