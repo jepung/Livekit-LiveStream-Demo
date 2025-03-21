@@ -21,14 +21,14 @@ export async function POST(req: NextRequest) {
         const currentTime = new Date().toISOString()
         const output: EncodedOutputs = {
             file: new EncodedFileOutput({
-                filepath: `test-record9/my-output-livekit-${currentTime}`,
+                filepath: `test-livekit1/my-output-livekit-${currentTime}`,
                 output: {
                     case: 's3',
                     value: {
                         accessKey: process.env.NEXT_PUBLIC_AWS_ACCESS_KEY,
                         secret: process.env.NEXT_PUBLIC_AWS_SECRET_KEY,
-                        bucket: 'streaming-recording-demo',
-                        region: 'ap-southeast-1',
+                        bucket: process.env.NEXT_PUBLIC_AWS_BUCKET_NAME,
+                        region: process.env.NEXT_PUBLIC_AWS_BUCKET_REGION,
                     },
                 },
             }),
@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
         const encodingOptions: EncodingOptions = {
             videoBitrate: 300, // 1 Mbps
             width: 640,
-            height: 360,
+            height: 480,
             framerate: 30,
             audioBitrate: 96,
             videoCodec: VideoCodec.VP8,
